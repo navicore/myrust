@@ -5,7 +5,8 @@ Set up GitHub Actions CI for a Rust project using `just` as the single source of
 1. Read `Cargo.toml` to find: workspace members (if any), edition, toolchain requirements
 2. Read `justfile` if it exists — adapt existing recipes rather than replacing them
 3. Read `.github/workflows/` if it exists — understand what's already configured
-4. Check `rust-toolchain.toml` or existing CI for the pinned Rust version, or default to stable
+4. Check the local Rust version (`rustc --version`) — pin CI to that exact version
+5. Verify `Cargo.lock` exists and is tracked by git — if not, error out and tell the user to commit it
 
 ## Steps
 
@@ -13,12 +14,12 @@ Set up GitHub Actions CI for a Rust project using `just` as the single source of
 
 The justfile is the **source of truth** for all build operations. CI workflows call `just ci` — nothing else.
 
-Required recipes:
+Required recipes (all cargo commands except `fmt` must use `--locked` to enforce Cargo.lock):
 - `fmt`: `cargo fmt --all`
 - `fmt-check`: `cargo fmt --all -- --check`
-- `lint`: `cargo clippy --workspace --all-targets -- -D warnings` (warnings are errors)
-- `test`: `cargo test --workspace --all-targets`
-- `build`: `cargo build --release` (adapt for workspace members that need special handling)
+- `lint`: `cargo clippy --locked --workspace --all-targets -- -D warnings` (warnings are errors)
+- `test`: `cargo test --locked --workspace --all-targets`
+- `build`: `cargo build --locked --release` (adapt for workspace members that need special handling)
 - `ci`: chains `fmt-check lint test build` — the single command developers run before pushing
 
 The `ci` recipe should print a summary on success:
@@ -32,7 +33,8 @@ Strategy: Linux on PRs (fast feedback), macOS on merge to main (saves cost).
 
 Create `.github/workflows/ci-linux.yml` (triggers on `pull_request` to main):
 - Use `extractions/setup-just@v2` to install just
-- Use `dtolnay/rust-toolchain@master` with pinned toolchain version + `rustfmt, clippy` components
+- Use `dtolnay/rust-toolchain@master` with the pinned toolchain version from step 4 + `rustfmt, clippy` components
+- Do NOT use `@stable` — it drifts between runs and causes CI failures that can't be reproduced locally
 - Cache `~/.cargo/registry` and `~/.cargo/git` keyed by `Cargo.lock` hash
 - Do NOT cache `target/` for test runs (stale test binaries cause false failures)
 - Run `just ci` as the single CI step
@@ -40,7 +42,10 @@ Create `.github/workflows/ci-linux.yml` (triggers on `pull_request` to main):
 
 Create `.github/workflows/ci-macos.yml` (triggers on `push` to main):
 - Same structure as Linux but `runs-on: macos-latest`
+- Same pinned toolchain version — both platforms must use the same Rust
 - Skip system dependency installation that's macOS-preinstalled
+
+Do NOT create `rust-toolchain.toml` — pin the version in CI workflows only.
 
 ### 3. Add CI section to justfile header
 
@@ -52,6 +57,9 @@ ci: fmt-check lint test build
 
 ## Constraints
 
+- `Cargo.lock` MUST be committed to git. For binary crates this is required; for library crates it is still recommended for CI reproducibility. If it is gitignored, remove it from `.gitignore` and commit it. All cargo commands in CI and in the justfile must use `--locked` so that a stale lockfile is a build failure, not a silent re-resolve.
+- Do NOT create `rust-toolchain.toml` — pin the Rust version in CI workflow files only
+- Do NOT use `dtolnay/rust-toolchain@stable` — it resolves to different versions on different days, causing CI failures that pass locally. Use `@master` with an explicit version string.
 - Do NOT modify Rust source code, Cargo.toml dependencies, or library code
 - Do NOT change the project's Rust edition or toolchain version — read what's configured
 - Do NOT add release, publishing, benchmarking, or security scanning — those are separate concerns
