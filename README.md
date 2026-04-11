@@ -39,8 +39,15 @@ depth, redundant comments, dead code, `unwrap` hygiene, visibility, layout,
 and terse-but-meaningful docs. It stays inside one file — cross-file refactors
 are flagged and deferred, not silently done.
 
-## The rule
+## The rules
 
-**The justfile is the source of truth.** GHA workflows call `just` recipes.
-Local dev uses `just` recipes. The model uses `just` recipes. Clippy flags,
-test scopes, and build targets are defined once, in the justfile.
+**The justfile is the source of truth for build operations.** GHA workflows
+call `just` recipes. Local dev uses `just` recipes. The model uses `just`
+recipes. Clippy flags, test scopes, and build targets are defined once, in
+the justfile.
+
+**The Rust toolchain is pinned in `rust-toolchain.toml` AND in every CI
+workflow's `dtolnay/rust-toolchain@master` step.** Two files, one invariant:
+they must agree. `/setup-rust-ci` enforces this on every run. Drift between
+local and CI rustfmt becomes a loud failure instead of a silent `fmt-check`
+failure on push.
