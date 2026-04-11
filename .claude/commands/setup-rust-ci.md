@@ -52,7 +52,7 @@ Write at the repo root:
 ```toml
 [toolchain]
 channel = "<version from step 4 of Inputs>"
-components = ["rustfmt", "clippy"]
+components = ["rustfmt", "clippy", "rust-analyzer"]
 ```
 
 Purpose: pin the toolchain for local development. Any `cd` into the repo makes `rustup`'s shims dispatch `cargo`, `rustfmt`, `clippy`, etc. to this exact version. Without this file, local dev uses whatever `rustup default` points at, which drifts from CI's pinned version and causes silent `fmt-check` / clippy failures on push.
