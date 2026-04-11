@@ -22,6 +22,22 @@ mkdir -p .claude/commands && cp -R ~/git/navicore/myrust/.claude/commands/* .cla
 | `/just-check` | Verifies justfile is source of truth — no raw cargo in GHA workflows. |
 | `/just-run <recipe>` | Runs a just recipe. Reminds the model to never use raw cargo. |
 | `/ci-check` | Runs `just ci` — the same checks GHA will run. |
+| `/setup-rust-ci` | Scaffolds justfile + GHA workflows so local and CI run the same checks. |
+| `/setup-crates-release` | Scaffolds a GHA release workflow that publishes to crates.io on tag. |
+| `/audit-rust-plan <path>` | Scans an area, writes a ranked file-level audit checklist to `tmp/`. Cheap. |
+| `/audit-rust-file [path]` | Deep file-level audit + refactor of one `.rs` file against the checklist. Expensive — run one file at a time. |
+
+## File-level audit workflow
+
+`/audit-rust-plan` and `/audit-rust-file` are a pair. The plan command is cheap
+(structural scanning only) and produces a durable, resumable checklist under
+`tmp/rust-audit-<slug>.md`. The file command is expensive (full read + refactor)
+and is meant to be run once per file, ticking items off the checklist as you go.
+
+Criteria it cares about: file header doc (`//!`), function length, nesting
+depth, redundant comments, dead code, `unwrap` hygiene, visibility, layout,
+and terse-but-meaningful docs. It stays inside one file — cross-file refactors
+are flagged and deferred, not silently done.
 
 ## The rule
 
