@@ -1,4 +1,4 @@
-Audit and (with approval) refactor a single Rust file for file-level health: header doc, function length, nesting, redundancy, `unwrap` hygiene, dead code, visibility, and terse docs. Pairs with `/audit-rust-plan`. $ARGUMENTS
+(myrust) Audit and (with approval) refactor a single Rust file for file-level health: header doc, function length, nesting, redundancy, `unwrap` hygiene, dead code, visibility, and terse docs. Pairs with `/audit-rust-plan`. $ARGUMENTS
 
 ## Inputs
 

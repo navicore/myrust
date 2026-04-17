@@ -1,4 +1,4 @@
-Set up a GitHub Actions release workflow that publishes Rust crates to crates.io when a GitHub release is tagged. Auto-updates Cargo.toml versions from the tag. $ARGUMENTS
+(myrust) Set up a GitHub Actions release workflow that publishes Rust crates to crates.io when a GitHub release is tagged. Auto-updates Cargo.toml versions from the tag. $ARGUMENTS
 
 ## Inputs
 

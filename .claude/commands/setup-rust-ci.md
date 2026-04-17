@@ -1,4 +1,4 @@
-Set up GitHub Actions CI for a Rust project using `just` as the single source of truth for build/test/lint. Both local dev and CI call the same recipes — no drift. $ARGUMENTS
+(myrust) Set up GitHub Actions CI for a Rust project using `just` as the single source of truth for build/test/lint. Both local dev and CI call the same recipes — no drift. $ARGUMENTS
 
 ## Inputs
 

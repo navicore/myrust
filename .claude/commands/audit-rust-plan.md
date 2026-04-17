@@ -1,4 +1,4 @@
-Scan a Rust source tree and produce a file-level audit checklist — a list of `.rs` files ranked by cheap size/complexity signals so you can work through them one at a time with `/audit-rust-file`. The checklist is durable and resumable across sessions. $ARGUMENTS
+(myrust) Scan a Rust source tree and produce a file-level audit checklist — a list of `.rs` files ranked by cheap size/complexity signals so you can work through them one at a time with `/audit-rust-file`. The checklist is durable and resumable across sessions. $ARGUMENTS
 
 ## Inputs
 
