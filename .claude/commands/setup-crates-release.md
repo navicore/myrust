@@ -2,10 +2,14 @@
 
 ## Inputs
 
-1. Read `Cargo.toml` to find: workspace members (if any), current version, `[workspace.package]` vs `[package]` structure
-2. Read all workspace member `Cargo.toml` files to map inter-crate dependencies (which crates reference each other with `path` + `version`)
-3. Read `.github/workflows/` to check for existing release workflows
-4. Determine the crate publish order (leaf dependencies first, dependents last)
+1. Read the root `Cargo.toml` and **determine the project shape**:
+   - **Single-crate**: has `[package]` at the root, no `[workspace]` section. One crate to publish.
+   - **Workspace**: has `[workspace]` with `members = [...]`. May also have `[workspace.package]` for shared version/metadata. Multiple crates to publish.
+2. If workspace: read each member's `Cargo.toml` to map inter-crate dependencies (which crates reference each other with `path` + `version`) and determine publish order (leaf dependencies first, dependents last).
+3. If single-crate: no dependency ordering needed — there's only one crate.
+4. Read `.github/workflows/` to check for existing release workflows.
+
+The rest of this command has two tracks — **single-crate** and **workspace**. Apply only the track that matches the project. Do not add workspace machinery to a single-crate project or vice versa.
 
 ## Steps
 
@@ -23,8 +27,24 @@ Triggers on: `release: types: [created]` with condition `startsWith(github.ref, 
 ```
 
 **b. Update Cargo.toml version(s):**
-- Read current version from `[workspace.package]` (or `[package]` for single-crate)
-- If it differs from tag, update using `awk` (not `sed` — awk handles section-scoped replacement):
+
+Use `awk` (not `sed`) so the replacement is scoped to the correct TOML section and doesn't corrupt dependency version strings. Target the section that owns the version for the project shape:
+
+- **Single-crate**: target `[package]`
+```bash
+awk -v new_version="$VERSION" '
+  /^\[package\]/ { in_section=1 }
+  /^\[/ && !/^\[package\]/ { in_section=0 }
+  in_section && /^version = / {
+    print "version = \"" new_version "\""
+    in_section=0
+    next
+  }
+  { print }
+' Cargo.toml > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
+```
+
+- **Workspace**: target `[workspace.package]`
 ```bash
 awk -v new_version="$VERSION" '
   /^\[workspace\.package\]/ { in_section=1 }
@@ -37,9 +57,10 @@ awk -v new_version="$VERSION" '
   { print }
 ' Cargo.toml > Cargo.toml.tmp && mv Cargo.toml.tmp Cargo.toml
 ```
-- For workspaces: also update pinned version strings (`version = "=X.Y.Z"`) in inter-crate dependencies using similar awk scripts scoped to the correct lines
-- Run `cargo generate-lockfile` after changes
-- Commit as `"chore: bump version to X.Y.Z"` using `github-actions[bot]` identity and push to main
+
+- **Workspace only**: also update pinned version strings (`version = "=X.Y.Z"`) in inter-crate dependencies across member `Cargo.toml` files using similar section-scoped awk scripts. Skip this step entirely for single-crate projects.
+- Run `cargo generate-lockfile` after changes.
+- Commit as `"chore: bump version to X.Y.Z"` using `github-actions[bot]` identity and push to main.
 
 **c. Checkout must use a PAT** (not `GITHUB_TOKEN`) to allow pushing back:
 ```yaml
@@ -50,15 +71,22 @@ awk -v new_version="$VERSION" '
 ```
 
 **d. Verify versions match** before publishing:
-- Each workspace member should use `version.workspace = true`
-- Inter-crate dependency pins should match workspace version
+- **Single-crate**: confirm `[package].version` matches the tag.
+- **Workspace**: each member should use `version.workspace = true`, and inter-crate dependency pins should match the workspace version.
 
-**e. Publish to crates.io in dependency order:**
-- Leaf crates first (no internal dependencies), then their dependents
-- Wait **120 seconds** between publishes (crates.io indexing delay)
+**e. Publish to crates.io:**
+
+Common flags for both shapes:
 - Use `--no-verify` (already tested by CI)
 - Handle re-publishes gracefully: `|| echo "::warning::publish failed (may already exist)"`
 - Use `CRATES_IO_TOKEN` secret
+
+**Single-crate** — one publish, no ordering, no sleep:
+```yaml
+- run: cargo publish --no-verify
+```
+
+**Workspace** — publish in dependency order (leaf crates first, then their dependents), with a **120 second** sleep between publishes to let crates.io index each one before the next depends on it.
 
 Example for a workspace with `core → runtime → compiler → lsp`:
 ```yaml
@@ -81,17 +109,18 @@ Tell the user to configure in repo Settings → Secrets:
 - `PAT`: Personal access token with `contents: write` scope (for pushing version bumps back to main)
 - `CRATES_IO_TOKEN`: API token from https://crates.io/settings/tokens
 
-### 3. Verify workspace version setup
+### 3. Verify version setup
 
-Check that each crate's `Cargo.toml` uses `version.workspace = true` under `[package]`. If any crate hardcodes a version, update it to use the workspace version. This ensures a single version bump in the workspace root propagates everywhere.
+- **Single-crate**: confirm the root `[package].version` is the single source of truth. Nothing else to do.
+- **Workspace**: check that each member's `Cargo.toml` uses `version.workspace = true` under `[package]`. If any crate hardcodes a version, update it to use the workspace version. This ensures a single version bump in the workspace root propagates everywhere.
 
 ## Constraints
 
 - Do NOT modify Rust source code or library logic
 - Do NOT set up CI (that's `setup-rust-ci`) — only the release/publish workflow
 - The awk version-update must be scoped to the correct TOML section to avoid corrupting dependency version strings
-- Inter-crate version pins (`version = "=X.Y.Z"`) only apply to workspace members that reference each other with both `path` and `version` — read the actual files to determine which ones
-- The publish order must respect the dependency graph — publishing a crate before its dependencies are indexed will fail
+- Inter-crate version pins (`version = "=X.Y.Z"`) and publish ordering only apply to workspaces — skip both for single-crate projects
+- For workspaces, publish order must respect the dependency graph — publishing a crate before its dependencies are indexed will fail
 
 ## Final step
 
