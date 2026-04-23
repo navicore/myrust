@@ -190,7 +190,10 @@ Add to `.gitignore`:
 
 ```gitignore
 /book/
+docs/README.md
 ```
+
+`docs/README.md` is a generated copy of the repo-root `README.md` — keeping it out of git prevents the two from drifting. If the generator is extended to produce other derived files under `docs/` (e.g. `docs/EXAMPLES.md`), add those to `.gitignore` as well.
 
 If the repo has an `examples/` tree with per-folder README files, extend the generator to stitch them into `docs/EXAMPLES.md` with category-based header-level adjustment. Use the header-adjust pattern the user can crib from patch-seq's `scripts/generate-examples-docs.sh`.
 
