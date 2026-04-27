@@ -70,6 +70,22 @@ awk -v new_version="$VERSION" '
     ref: main
 ```
 
+**c2. Pin the Rust toolchain — same version as CI:**
+
+If `rust-toolchain.toml` exists at the repo root (i.e. `setup-rust-ci` has been run), the release workflow MUST pin the same version explicitly. Use `dtolnay/rust-toolchain@master` with an explicit `toolchain:` input — NOT `@stable`.
+
+```yaml
+# Pinned to match `rust-toolchain.toml` and `.github/workflows/ci-*.yml`.
+# All three values MUST agree — see `setup-rust-ci` invariant.
+- uses: dtolnay/rust-toolchain@master
+  with:
+    toolchain: <same version as rust-toolchain.toml channel>
+```
+
+Why: `release.yml` runs `cargo generate-lockfile` and `cargo publish`. If it uses `@stable`, it can resolve to a different rustc than CI tested with, producing a `Cargo.lock` that CI never saw — which is exactly the drift `setup-rust-ci` exists to prevent. Pin to the same version, and `release.yml` becomes part of the same invariant `setup-rust-ci` enforces (see its section 2b: "For every `.github/workflows/*.yml`...").
+
+If `rust-toolchain.toml` does NOT exist, recommend the user run `setup-rust-ci` first — leaving the release workflow on `@stable` while CI is also unpinned just defers the drift problem.
+
 **d. Verify versions match** before publishing:
 - **Single-crate**: confirm `[package].version` matches the tag.
 - **Workspace**: each member should use `version.workspace = true`, and inter-crate dependency pins should match the workspace version.
@@ -121,6 +137,7 @@ Tell the user to configure in repo Settings → Secrets:
 - The awk version-update must be scoped to the correct TOML section to avoid corrupting dependency version strings
 - Inter-crate version pins (`version = "=X.Y.Z"`) and publish ordering only apply to workspaces — skip both for single-crate projects
 - For workspaces, publish order must respect the dependency graph — publishing a crate before its dependencies are indexed will fail
+- If `rust-toolchain.toml` exists, `release.yml` MUST use `dtolnay/rust-toolchain@master` with an explicit `toolchain:` input matching the file's `channel` value. Never use `@stable` here — it bypasses the toolchain pin that CI relies on and reintroduces drift between what CI tests and what release publishes.
 
 ## Final step
 
@@ -130,3 +147,5 @@ Update relevant docs (README.md or ARCHITECTURE.md) to document:
 - What happens automatically: version bump, publish, (optional) binary builds
 
 <!-- Reference: pattern extracted from navicore/patch-seq -->
+
+<!-- Reference: section 1c2 (toolchain pin) was added after navicore/patch-rexx — release.yml had been generated with `@stable` while CI and rust-toolchain.toml were pinned to a specific version, recreating the drift problem `setup-rust-ci` was designed to eliminate. The pin in release.yml must be part of the same invariant. -->
