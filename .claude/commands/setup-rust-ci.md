@@ -14,13 +14,17 @@
 
 The justfile is the **source of truth** for all build operations. CI workflows call `just ci` — nothing else.
 
-Required recipes (all cargo commands except `fmt` must use `--locked` to enforce Cargo.lock):
+Required recipes (all cargo commands except `fmt` and `clean` must use `--locked` to enforce Cargo.lock):
 - `fmt`: `cargo fmt --all`
 - `fmt-check`: `cargo fmt --all -- --check`
 - `lint`: `cargo clippy --locked --workspace --all-targets -- -D warnings` (warnings are errors)
 - `test`: `cargo test --locked --workspace --all-targets`
 - `build`: `cargo build --locked --release` (adapt for workspace members that need special handling)
-- `ci`: chains `fmt-check lint test build` — the single command developers run before pushing
+- `install`: `cargo install --path . --locked --force` — installs the default binary into `~/.cargo/bin`. `--force` so re-running overwrites a previous install. For workspaces with multiple binary crates, install each with `--path <member>` or use `--bin <name>`. Skip this recipe entirely for library-only crates.
+- `clean`: `cargo clean` — no `--locked` (it's a no-op for clean and would error in older cargo versions)
+- `ci`: chains `fmt-check lint test build` — the single command developers run before pushing. Do NOT include `install` or `clean` in `ci`.
+
+`install` and `clean` are always added even though CI doesn't call them. They're standard developer ergonomics — `just install` to put the binary on PATH, `just clean` to nuke `target/` — and adding them up front means every project converges on the same recipe names instead of users inventing their own.
 
 The `ci` recipe should print a summary on success:
 ```
@@ -106,3 +110,5 @@ Update relevant docs (README.md or ARCHITECTURE.md) to document:
 - What CI checks: formatting, clippy (warnings=errors), tests, build
 
 <!-- Reference: refined after a drift incident in navicore/patch-seq where local rustfmt disagreed with CI rustfmt. Local was running unpinned rustup stable; CI was pinned to 1.93.0. Fix: rust-toolchain.toml pins local to match CI, and the command enforces the two stay in sync. dtolnay/rust-toolchain does NOT auto-read the file — both places must be written and verified. -->
+
+<!-- Reference: `install` and `clean` recipes were added after navicore/patch-rexx — they aren't called by CI but every project ends up wanting them. Adding them by default keeps recipe names consistent across repos. -->
