@@ -1,3 +1,8 @@
+<!-- ghmig:moved -->
+> **This repository has moved to [https://git.navicore.tech/navicore/myrust](https://git.navicore.tech/navicore/myrust).**
+>
+> The GitHub copy is archived and no longer maintained.
+
 # myrust
 
 Rust-specific conventions for AI coding tools. Companion to
