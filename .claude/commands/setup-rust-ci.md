@@ -22,9 +22,32 @@ Required recipes (all cargo commands except `fmt` and `clean` must use `--locked
 - `build`: `cargo build --locked --release` (adapt for workspace members that need special handling)
 - `install`: `cargo install --path . --locked --force` — installs the default binary into `~/.cargo/bin`. `--force` so re-running overwrites a previous install. For workspaces with multiple binary crates, install each with `--path <member>` or use `--bin <name>`. Skip this recipe entirely for library-only crates.
 - `clean`: `cargo clean` — no `--locked` (it's a no-op for clean and would error in older cargo versions)
-- `ci`: chains `fmt-check lint test build` — the single command developers run before pushing. Do NOT include `install` or `clean` in `ci`.
+- `stats`: prints LOC + largest files + (workspace only) module tree. Template below — adapt the source path to the project's layout.
+- `ci`: chains `fmt-check lint test build` — the single command developers run before pushing. Do NOT include `install`, `clean`, or `stats` in `ci`.
 
-`install` and `clean` are always added even though CI doesn't call them. They're standard developer ergonomics — `just install` to put the binary on PATH, `just clean` to nuke `target/` — and adding them up front means every project converges on the same recipe names instead of users inventing their own.
+`install`, `clean`, and `stats` are always added even though CI doesn't call them. They're standard developer ergonomics — `just install` to put the binary on PATH, `just clean` to nuke `target/`, `just stats` for a quick "what does this codebase look like" snapshot — and adding them up front means every project converges on the same recipe names instead of users inventing their own.
+
+Template `stats` recipe (adapt the path to wherever sources live — `crates/` for a Cargo workspace, `src/` for a single crate). The leading `@` on the lines suppresses recipe-line echo so the output is just the report:
+
+```just
+# Quick code stats: LOC, largest files, module tree.
+# Requires `scc` (brew install scc · or · cargo install scc) and
+# `cargo-modules` (cargo install cargo-modules) — both are dev-only,
+# not in Cargo.toml. The cargo-modules call falls back to a hint if
+# the tool is missing so the recipe still prints something useful.
+stats:
+    @echo "=== Workspace LOC ==="
+    @scc {{src_dir}} --no-cocomo
+    @echo ""
+    @echo "=== Largest Rust source files (top 15) ==="
+    @scc {{src_dir}} --by-file --no-cocomo -s lines -i rs | head -20
+    @echo ""
+    @echo "=== Module tree ==="
+    @cargo modules structure -p {{primary_lib_crate}} --lib 2>/dev/null \
+      || echo "(install cargo-modules for the module tree: cargo install cargo-modules)"
+```
+
+Substitute `{{src_dir}}` with the actual sources path and `{{primary_lib_crate}}` with the workspace's main library crate (or omit `-p ...` for a single-crate project). For projects with a runtime/hot path worth highlighting, add an extra `scc <hot-path> -s complexity` block — that's project-specific and not part of the default template.
 
 The `ci` recipe should print a summary on success:
 ```
@@ -112,3 +135,5 @@ Update relevant docs (README.md or ARCHITECTURE.md) to document:
 <!-- Reference: refined after a drift incident in navicore/patch-seq where local rustfmt disagreed with CI rustfmt. Local was running unpinned rustup stable; CI was pinned to 1.93.0. Fix: rust-toolchain.toml pins local to match CI, and the command enforces the two stay in sync. dtolnay/rust-toolchain does NOT auto-read the file — both places must be written and verified. -->
 
 <!-- Reference: `install` and `clean` recipes were added after navicore/patch-rexx — they aren't called by CI but every project ends up wanting them. Adding them by default keeps recipe names consistent across repos. -->
+
+<!-- Reference: `stats` recipe was added after navicore/patch-seq — same category as install/clean (developer ergonomics, not CI), but every project ends up wanting a quick "what does this codebase look like" report. Default template uses scc + cargo-modules; both are external tools the user installs once. -->
